@@ -1,4 +1,4 @@
-const key = 'f66b236b4bc84c3fa04155111210806';
+const key = '88304825099f419bbe1142108210906';
 const cityName = document.querySelector(".city-name");
 const tempValue = document.querySelector(".city-weather");
 const forecastDay1 = document.querySelector(".forecast-date1");
@@ -7,47 +7,42 @@ const forecastDay3 = document.querySelector(".forecast-date3");
 const forecastTemp1 = document.querySelector(".forecast-temp1");
 const forecastTemp2 = document.querySelector(".forecast-temp2");
 const forecastTemp3 = document.querySelector(".forecast-temp3");
-const submitInput = document.getElementById("city")
+const submitInput = document.getElementById("city");
 const submitButton = document.getElementById("submit");
+const forecastDays = [forecastDay1, forecastDay2, forecastDay3];
+const forecastTemps = [forecastTemp1, forecastTemp2, forecastTemp3];
+const autoComplete = document.querySelector(".autocomplete");
 let Days = ['Sun', 'Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat']
+
+const fetchAPI = async (query) => {
+    const base = `http://api.weatherapi.com/v1/${query}`;
+
+    const res = await fetch(base);
+    const data = await res.json();
+    return data;
+}
 
 const getCity = async (city) => {
 
-    const base = 'http://api.weatherapi.com/v1/current.json';
-    const query = `?key=${key}&q=${city}&aqi=no`;
-
-    const res = await fetch(base + query);
-    const data = await res.json();
+    const query = `current.json?key=${key}&q=${city}&aqi=no`;
+    const data = await fetchAPI(query);
 
     cityName.innerHTML = data.location.name;
-    tempValue.innerHTML = `${data.current.temp_c} °`;
+    tempValue.innerHTML = `${data.current.temp_c}°`;
     return data;
 };
 
 const getForecast = async (city) => {
-    const base = 'http://api.weatherapi.com/v1/forecast.json';
-    const query = `?key=${key}&q=${city}&days=12&aqi=no`
+    const query = `forecast.json?key=${key}&q=${city}&days=12&aqi=no`
+    const data = await fetchAPI(query);
 
-    const res = await fetch(base + query);
-    const data = await res.json();
-
-    let Day1 = new Date(data.forecast.forecastday[0].date);
-    let Day2 = new Date(data.forecast.forecastday[1].date);
-    let Day3 = new Date(data.forecast.forecastday[2].date);
-
-    let minTemp1 = data.forecast.forecastday[0].day.mintemp_c;
-    let minTemp2 = data.forecast.forecastday[1].day.mintemp_c;
-    let minTemp3 = data.forecast.forecastday[2].day.mintemp_c;
-    let maxTemp1 = data.forecast.forecastday[0].day.maxtemp_c;
-    let maxTemp2 = data.forecast.forecastday[1].day.maxtemp_c;
-    let maxTemp3 = data.forecast.forecastday[2].day.maxtemp_c;
-
-    forecastDay1.innerHTML = Days[Day1.getDay()];
-    forecastDay2.innerHTML = Days[Day2.getDay()];
-    forecastDay3.innerHTML = Days[Day3.getDay()];
-    forecastTemp1.innerHTML = `${minTemp1} / ${maxTemp1}`
-    forecastTemp2.innerHTML = `${minTemp2} / ${maxTemp2}`
-    forecastTemp3.innerHTML = `${minTemp3} / ${maxTemp3}`
+    data.forecast.forecastday.forEach((forecastday, index) => {
+        let date = new Date(forecastday.date)
+        let minTemp = forecastday.day.mintemp_c;
+        let maxTemp = forecastday.day.maxtemp_c;
+        forecastDays[index].innerHTML = Days[date.getDay()];
+        forecastTemps[index].innerHTML = `${minTemp} / ${maxTemp}`;
+    });
     return data;
 };
 
@@ -64,3 +59,70 @@ submitButton.addEventListener("click", e => {
             console.log(err);
         })
 });
+
+const firstLoadforecast = async () => {
+    const query = `forecast.json?key=${key}&q=auto:ip&days=12&aqi=no`
+    const data = await fetchAPI(query);
+
+    data.forecast.forecastday.forEach((forecastday, index) => {
+        let date = new Date(forecastday.date)
+        let minTemp = forecastday.day.mintemp_c;
+        let maxTemp = forecastday.day.maxtemp_c;
+        forecastDays[index].innerHTML = Days[date.getDay()];
+        forecastTemps[index].innerHTML = `${minTemp} / ${maxTemp}`;
+    });
+};
+
+const firstLoadCurrent = async () => {
+    const query = `current.json?key=${key}&q=auto:ip&aqi=no`
+    const data = await fetchAPI(query);
+
+    cityName.innerHTML = data.location.name;
+    tempValue.innerHTML = `${data.current.temp_c}°`;
+};
+
+const myDebounce = (fn, delay) => {
+    let Timer;
+    return function () {
+        let context = this,
+            args = arguments;
+
+        clearTimeout(Timer);
+        Timer = setTimeout(() => {
+            fn.apply(context, args);
+        }, delay)
+    }
+}
+
+
+
+let searchCities = async searchText => {
+    if (searchText.length > 3) {
+        const query = `forecast.json?key=${key}&q=${searchText}&aqi=no`
+        const data = await fetchAPI(query);
+
+        let matches = Object.values(data.location);
+        autoComplete.innerHTML = matches[0];
+        autoComplete.classList.remove("yellowed");
+        autoComplete.addEventListener("click", e => {
+            e.preventDefault();
+            let city = e.target.innerText;
+            getCity(city);
+            getForecast(city);
+        })
+    } else {
+        autoComplete.innerHTML = "input three or more letters";
+        autoComplete.classList.add("yellowed");
+        matches = [];
+    }
+}
+submitInput.addEventListener('input', () => {
+    searchCities(submitInput.value);
+});
+
+
+searchCities = myDebounce(searchCities, 1000);
+
+// Execution
+firstLoadCurrent();
+firstLoadforecast();
